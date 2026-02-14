@@ -124,10 +124,19 @@ class ConstantLengthDataset(IterableDataset):
                 if sample is None:  # Ratings filtered out the sample
                     continue
 
+                # Skip samples that exceed the absolute maximum length
                 if len(sample["input_ids"]) >= self.max_sample_length:
-                    continue  # skip overly long samples
+                    continue
                 if len(sample["images"]) > self.max_images_per_example:
                     continue  # skip samples that exceed the image constraint
+
+                # Truncate samples that are longer than seq_length to fit in packing
+                # Account for the padding token that will be added below (seq_length - 1)
+                # This preserves data instead of filtering it out entirely
+                if len(sample["input_ids"]) >= self.seq_length:
+                    sample["input_ids"] = sample["input_ids"][:self.seq_length - 1]
+                    sample["labels"] = sample["labels"][:self.seq_length - 1]
+                    sample["attention_mask"] = sample["attention_mask"][:self.seq_length - 1]
 
                 sample["input_ids"] = torch.cat(
                     [
