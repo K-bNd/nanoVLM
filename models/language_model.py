@@ -317,9 +317,10 @@ class LanguageModelGroupedQueryAttention(nn.Module):
             mask_for_keys = attention_mask[
                 :, :T_kv
             ]  # Ensure mask matches key length [B, T_kv]
+            mask_value = -1e4 if q.dtype == torch.float16 else -1e9
             additive_attn_mask = (
                 1.0 - mask_for_keys.unsqueeze(1).unsqueeze(2).float()
-            ) * torch.finfo(q.dtype).min
+            ) * mask_value
             # This additive_attn_mask shape is [B, 1, 1, T_kv]
 
         if self.sdpa and x.device.type != "mps":
