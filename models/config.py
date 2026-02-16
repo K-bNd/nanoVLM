@@ -133,7 +133,7 @@ class TrainConfig:
     max_grad_norm: float = 1.0
     eval_in_epochs: bool = True
     eval_interval: int = 500
-    use_slurm: bool = True
+    use_slurm: bool = False
     stats_log_interval: int = 100
     max_training_steps: int = 200
     max_images_per_example: int = 2
