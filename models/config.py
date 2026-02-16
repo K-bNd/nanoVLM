@@ -133,11 +133,12 @@ class TrainConfig:
     max_grad_norm: float = 1.0
     eval_in_epochs: bool = True
     eval_interval: int = 500
+    use_slurm: bool = True
     stats_log_interval: int = 100
     max_training_steps: int = 200
     max_images_per_example: int = 2
     max_images_per_knapsack: int = 8
-    max_sample_length: int = 4096  # Allow longer samples; they'll be packed into 256-token sequences
+    max_sample_length: int = 4096
     compile: bool = False
     resume_from_vlm_checkpoint: bool = False  # Indicate if the training should be resumed from a checkpoint of the whole VLM or you want to start from scratch
     # train_dataset_path: str = "HuggingFaceM4/FineVisionMax"

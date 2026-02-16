@@ -15,7 +15,6 @@ import numpy
 import torch
 import torch.distributed as dist
 import torch.optim as optim
-import wandb
 from datasets import (
     concatenate_datasets,
     get_dataset_config_names,
@@ -25,18 +24,21 @@ from datasets import (
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 
+import wandb
+
 torch.manual_seed(0)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(0)
 
 PG_CPU = None
 
-import models.config as config
 from data.advanced_datasets import ConstantLengthDataset
 from data.collators import VQACollator
 from data.data_utils import synchronized_dataloader_step
 from data.datasets import VQADataset
 from data.processors import get_image_processor, get_tokenizer
+from evaluation import cli_evaluate
+from models.config import TrainConfig, VLMConfig
 from models.vision_language_model import VisionLanguageModel
 
 # Otherwise, the tokenizer will throw a warning
@@ -118,7 +120,7 @@ def wrap_model(model):
     )
 
 
-def get_run_name(train_cfg, vlm_cfg):
+def get_run_name(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
     batch_size = f"bs{int(train_cfg.batch_size * get_world_size() * train_cfg.gradient_accumulation_steps)}"
     max_training_steps = f"{train_cfg.max_training_steps}"
     learning_rate = f"lr_vision_{train_cfg.lr_vision_backbone}-language_{train_cfg.lr_language_backbone}-{train_cfg.lr_mp}"
@@ -131,7 +133,7 @@ def get_run_name(train_cfg, vlm_cfg):
     return f"nanoVLM_{vit}_{mp}_{llm}_{num_gpus}_{batch_size}_{max_training_steps}_{learning_rate}_{date}"
 
 
-def get_dataloaders(train_cfg, vlm_cfg):
+def get_dataloaders(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
     print(f"Getting dataloaders from {train_cfg.train_dataset_path}")
     # Create datasets
     image_processor = get_image_processor(
@@ -319,7 +321,7 @@ def get_lr(it, max_lr, max_steps):
     return min_lr + coeff * (max_lr - min_lr)
 
 
-def train(train_cfg, vlm_cfg):
+def train(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
     train_loader, val_loader, iter_train_loader, iter_val_loader = get_dataloaders(
         train_cfg, vlm_cfg
     )
@@ -614,10 +616,19 @@ def train(train_cfg, vlm_cfg):
                             train_cfg.use_lmms_eval
                             and global_step % (train_cfg.eval_interval * 2) == 0
                         ):
-                            # Submit evaluation job
+                            # During your validation loop
+                            args = argparse.Namespace(
+                                model=checkpoint_path_step,
+                                tasks=train_cfg.lmms_eval_tasks,
+                                batch_size=train_cfg.lmms_eval_batch_size,
+                            )
                             cmd = f"sbatch eval.slurm {checkpoint_path_step} {global_step} {run_name} {train_cfg.lmms_eval_limit} {train_cfg.lmms_eval_tasks} {train_cfg.lmms_eval_batch_size}"
-                            print(f"Submitting evaluation job: {cmd}")
-                            subprocess.run(cmd, shell=True)
+                            if train_cfg.use_slurm:
+                                print(f"Submitting evaluation job: {cmd}")
+                                subprocess.run(cmd, shell=True)
+                            else:
+                                results = cli_evaluate(args)
+                                print(f"Evaluation results: {results}")
 
                     if avg_val_loss < best_val_loss:
                         best_val_loss = avg_val_loss
@@ -893,8 +904,8 @@ def main():
 
     args = parser.parse_args()
 
-    vlm_cfg = config.VLMConfig()
-    train_cfg = config.TrainConfig()
+    vlm_cfg = VLMConfig()
+    train_cfg = TrainConfig()
 
     if args.lr_mp is not None:
         train_cfg.lr_mp = args.lr_mp
