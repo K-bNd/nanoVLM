@@ -283,7 +283,7 @@ def parse_eval_args() -> argparse.Namespace:
     args = parser.parse_args()
     return args
     
-def cli_evaluate(args: Union[argparse.Namespace, None] = None) -> None:
+def cli_evaluate(args: Union[argparse.Namespace, None] = None) -> list:
     default_args = parse_eval_args()
 
     if args is None and len(sys.argv) == 1:

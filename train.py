@@ -629,6 +629,20 @@ def train(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
                             else:
                                 results = cli_evaluate(args)
                                 print(f"Evaluation results: {results}")
+                                if train_cfg.log_wandb and results:
+                                    eval_tasks = [t.strip() for t in train_cfg.lmms_eval_tasks.split(",")]
+                                    for result in results:
+                                        if result is not None:
+                                            lmms_results = result.get("results", {})
+                                            metrics = {
+                                                f"lmms_eval/{task}/{metric}": value
+                                                for task, task_results in lmms_results.items()
+                                                if task in eval_tasks
+                                                for metric, value in task_results.items()
+                                            }
+                                            if metrics:
+                                                metrics[lmms_eval_step] = global_step
+                                                run.log(metrics, step=global_step)
 
                     if avg_val_loss < best_val_loss:
                         best_val_loss = avg_val_loss
@@ -640,7 +654,7 @@ def train(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
                             f"Step: {global_step}, Val Loss: {avg_val_loss:.4f}, Tokens/s: {tokens_per_second:.2f}"
                         )
                         if train_cfg.log_wandb:
-                            run.log({"val_loss": avg_val_loss}, step=global_step)
+                            run.log({"val/loss": avg_val_loss}, step=global_step)
 
                 model.train()
 
@@ -699,12 +713,7 @@ def train(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
                 # MASTER ONLY: Log to wandb
                 if train_cfg.log_wandb and is_master():
                     run.log(
-                        {
-                            **{
-                                f"training_stats/{key}": value
-                                for key, value in stats.items()
-                            },
-                        },
+                        {f"train/{key}": value for key, value in stats.items()},
                         step=global_step,
                     )
 
@@ -727,11 +736,14 @@ def train(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
                                         eval_data = json.load(f)
 
                                     lmms_results = eval_data.get("results", {})
-                                    if lmms_results:
-                                        metrics = {
-                                            f"lmms_eval/{key}": value
-                                            for key, value in lmms_results.items()
-                                        }
+                                    eval_tasks = [t.strip() for t in train_cfg.lmms_eval_tasks.split(",")]
+                                    metrics = {
+                                        f"lmms_eval/{task}/{metric}": value
+                                        for task, task_results in lmms_results.items()
+                                        if task in eval_tasks
+                                        for metric, value in task_results.items()
+                                    }
+                                    if metrics:
                                         metrics[lmms_eval_step] = eval_data[
                                             "global_step"
                                         ]
@@ -771,9 +783,9 @@ def train(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
                 if train_cfg.log_wandb and is_master():
                     run.log(
                         {
-                            "batch_loss": batch_loss_gathered,
+                            "train/batch_loss": batch_loss_gathered,
                             **(
-                                {"grad_norm": grad_norm}
+                                {"train/grad_norm": grad_norm}
                                 if train_cfg.max_grad_norm is not None
                                 else {}
                             ),
@@ -810,9 +822,9 @@ def train(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
             if train_cfg.log_wandb:
                 run.log(
                     {
-                        "epoch_loss": avg_train_loss,
-                        "epoch_duration": epoch_duration,
-                        "epoch_tokens_per_second": epoch_tokens_per_second,
+                        "train/epoch_loss": avg_train_loss,
+                        "train/epoch_duration": epoch_duration,
+                        "train/epoch_tokens_per_second": epoch_tokens_per_second,
                     }
                 )
 
