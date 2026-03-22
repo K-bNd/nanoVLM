@@ -229,10 +229,6 @@ class LanguageModelGroupedQueryAttention(nn.Module):
 
         # Use scaled dot product attention if available
         self.sdpa = hasattr(torch.nn.functional, "scaled_dot_product_attention")
-        if not self.sdpa:
-            print(
-                "Warning: scaled dot product attention not available, using standard attention in LM."
-            )
 
     def forward(
         self,
@@ -319,7 +315,7 @@ class LanguageModelGroupedQueryAttention(nn.Module):
             ]  # Ensure mask matches key length [B, T_kv]
             mask_value = -1e4 if q.dtype == torch.float16 else -1e9
             additive_attn_mask = (
-                1.0 - mask_for_keys.unsqueeze(1).unsqueeze(2).float()
+                1.0 - mask_for_keys.unsqueeze(1).unsqueeze(2).to(q.dtype)
             ) * mask_value
             # This additive_attn_mask shape is [B, 1, 1, T_kv]
 

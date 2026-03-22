@@ -128,8 +128,6 @@ class BaseDataset(Dataset):
             tokenize=True,
             add_special_tokens=False,
             return_dict=True,
-            max_length=8192,  # Truncate to model's max_position_embeddings
-            truncation=True,
         )
         mask = [0] * len(conv_ids["input_ids"])
 
@@ -137,8 +135,8 @@ class BaseDataset(Dataset):
         cursor = 0
         for msg in messages:
             segment_ids = self.tokenizer.apply_chat_template(
-                [msg], tokenize=True, add_special_tokens=False
-            )
+                [msg], tokenize=True, add_special_tokens=False, return_dict=True
+            )["input_ids"]
             seg_len = len(segment_ids)
 
             if msg["role"] == "assistant":
