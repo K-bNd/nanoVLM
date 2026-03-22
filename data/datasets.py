@@ -1,8 +1,10 @@
+import logging
+
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
+
 from data.processors import get_image_string
-import logging
 
 
 class BaseDataset(Dataset):
@@ -90,8 +92,8 @@ class BaseDataset(Dataset):
         cursor = 0
         for msg in messages:
             segment_ids = self.tokenizer.apply_chat_template(
-                [msg], tokenize=True, add_special_tokens=False
-            )
+                [msg], tokenize=True, add_special_tokens=False, return_dict=True
+            )["input_ids"]
             seg_len = len(segment_ids)
 
             if msg["role"] == "assistant":
